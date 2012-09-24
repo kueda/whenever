@@ -27,18 +27,27 @@ Capistrano::Configuration.instance(:must_exist).load do
       roles = [options[:roles]].flatten if options[:roles]
 
       if find_servers(options).any?
-        roles_arg = "" # empty for begin
-        roles_arg = " --roles #{roles.join(",")}" unless roles.empty?
+        # make sure we go through the roles.each loop at least once
+        roles << :__none if roles.empty?
 
-        on_rollback do
-          if fetch :previous_release
-            run "cd #{fetch :previous_release} && #{fetch :whenever_command} #{fetch :whenever_update_flags}#{roles_arg}", options
+        roles.each do |role|
+          if role == :__none
+            role_arg = ''
           else
-            run "cd #{fetch :release_path} && #{fetch :whenever_command} #{fetch :whenever_clear_flags}", options
+            options[:roles] = role
+            role_arg = " --roles #{role}"
           end
+
+          on_rollback do
+            if fetch :previous_release
+              run "cd #{fetch :previous_release} && #{fetch :whenever_command} #{fetch :whenever_update_flags}#{role_arg}", options
+            else
+              run "cd #{fetch :release_path} && #{fetch :whenever_command} #{fetch :whenever_clear_flags}", options
+            end
+          end
+
+          run "cd #{fetch :current_path} && #{fetch :whenever_command} #{fetch :whenever_update_flags}#{role_arg}", options
         end
-        
-        run "cd #{fetch :current_path} && #{fetch :whenever_command} #{fetch :whenever_update_flags}#{roles_arg}", options
       end
     end
 
